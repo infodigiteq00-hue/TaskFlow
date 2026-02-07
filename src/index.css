@@ -110,15 +110,30 @@
     @apply border-border;
   }
 
+  /* Fluid base: ~14px at 320px viewport, ~16px at 1024px */
+  html {
+    font-size: clamp(0.875rem, 0.8rem + 0.25vw, 1rem);
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+
+  /* Responsive headings – scale with viewport */
+  h1 { @apply text-lg sm:text-xl md:text-2xl; }
+  h2 { @apply text-base sm:text-lg md:text-xl; }
+  h3 { @apply text-sm sm:text-base md:text-lg; }
 }
 
 @layer utilities {
   .glass-card {
     @apply bg-card/80 backdrop-blur-sm border border-border/50 shadow-lg;
+  }
+
+  /* Glassmorphism for auth forms – translucent, blurred */
+  .glass-form {
+    @apply bg-white/70 dark:bg-card/60 backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-2xl;
   }
 
   .status-badge {
@@ -168,4 +183,9 @@
       transform: translateY(0);
     }
   }
+
+  /* Responsive text – use where fixed sizes are too small on mobile */
+  .text-responsive-sm { @apply text-xs sm:text-sm; }
+  .text-responsive-base { @apply text-sm sm:text-base; }
+  .text-responsive-lg { @apply text-base sm:text-lg; }
 }

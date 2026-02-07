@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Task, CategoryOption, TeamMember } from '@/types/task';
+import { getAssignedNames, getDueCountdown, getDueBreakdown, slugify } from '@/lib/taskUtils';
 import { cn } from '@/lib/utils';
 import {
   Briefcase,
@@ -46,6 +47,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CategoryTaskListSheet } from './CategoryTaskListSheet';
 import { TaskDetailSheet } from './TaskDetailSheet';
+import { RippleIcon } from './RippleIcon';
 
 interface DashboardProps {
   tasks: Task[];
@@ -91,83 +93,6 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
   banner: Image,
   other: Folder,
 };
-
-const ACTIVE_STATUSES = ['in-progress', 'urgent'] as const;
-
-function getDueBreakdown(tasks: Task[]): { taskActive: number; overdue: number; upcoming: number } {
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const notCompleted = tasks.filter((t) => t.status !== 'completed');
-  let taskActive = 0;
-  let overdue = 0;
-  let upcoming = 0;
-  for (const t of notCompleted) {
-    if (ACTIVE_STATUSES.includes(t.status as (typeof ACTIVE_STATUSES)[number])) taskActive += 1;
-    const d = (t.endDate || '').slice(0, 10);
-    if (d < todayStr) overdue += 1;
-    else if (d >= todayStr) upcoming += 1;
-  }
-  return { taskActive, overdue, upcoming };
-}
-
-function RippleIcon({ Icon, accentClass }: { Icon: LucideIcon; accentClass: string }) {
-  return (
-    <div className="absolute -right-2 top-1/2 -translate-y-1/2 pointer-events-none">
-      <div className="relative w-36 h-36 flex items-center justify-center">
-        <span className={cn('absolute w-full h-full rounded-full border border-current/35', accentClass)} />
-        <span className={cn('absolute w-[80%] h-[80%] rounded-full border border-current/28', accentClass)} />
-        <span className={cn('absolute w-[60%] h-[60%] rounded-full border border-current/20', accentClass)} />
-        <span className={cn('absolute w-[45%] h-[45%] rounded-full bg-current/18', accentClass)} />
-        <span className={cn('absolute w-[32%] h-[32%] rounded-full bg-current/12 flex items-center justify-center', accentClass)}>
-          <Icon className={cn('w-9 h-9', accentClass)} style={{ opacity: 0.7 }} strokeWidth={1.5} />
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function slugify(str: string): string {
-  return str
-    .toLowerCase()
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-]/g, '');
-}
-
-function getDueCountdown(endDate: string, endTime?: string): { text: string; overdue: boolean } {
-  const end = new Date(endDate);
-  if (endTime) {
-    const [h, m] = endTime.split(':').map(Number);
-    end.setHours(h ?? 0, m ?? 0, 0, 0);
-  } else {
-    end.setHours(23, 59, 59, 999);
-  }
-  const now = new Date();
-  const diffMs = end.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-  const diffHours = Math.ceil(diffMs / (1000 * 60 * 60));
-  const diffMins = Math.ceil(diffMs / (1000 * 60));
-  if (diffMs < 0) {
-    const absHours = Math.floor(Math.abs(diffMs) / (1000 * 60 * 60));
-    const absMins = Math.floor((Math.abs(diffMs) % (1000 * 60 * 60)) / (1000 * 60));
-    if (endTime && Math.abs(diffMs) < 24 * 60 * 60 * 1000)
-      return { text: `${absHours}h ${absMins}m overdue`, overdue: true };
-    return { text: `${Math.abs(diffDays)} day(s) overdue`, overdue: true };
-  }
-  if (diffMins < 60 && endTime)
-    return { text: `${diffMins} min left`, overdue: false };
-  if (diffHours < 24 && (endTime || diffHours > 0))
-    return { text: `${diffHours} hour${diffHours !== 1 ? 's' : ''} left`, overdue: false };
-  if (diffDays === 0) return { text: endTime ? `Due today` : 'Due today', overdue: false };
-  if (diffDays === 1) return { text: '1 day left', overdue: false };
-  return { text: `${diffDays} days left`, overdue: false };
-}
-
-function getAssignedNames(assignedTo: string[], teamMembers: TeamMember[]): string {
-  if (!assignedTo.length) return 'Unassigned';
-  const names = assignedTo
-    .map((id) => teamMembers.find((m) => m.id === id)?.name)
-    .filter(Boolean) as string[];
-  return names.length ? names.join(', ') : 'Unassigned';
-}
 
 export function Dashboard({
   tasks,
@@ -252,17 +177,17 @@ export function Dashboard({
   };
 
   return (
-    <div className="space-y-5 animate-fade-in max-w-5xl">
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-sm text-muted-foreground">Category cards</p>
+    <div className="space-y-4 sm:space-y-5 animate-fade-in max-w-5xl w-full">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+        <p className="text-xs sm:text-sm text-muted-foreground">Category cards</p>
         <Button
           type="button"
           variant="outline"
           size="sm"
           onClick={() => setAddCategoryOpen(true)}
-          className="gap-2"
+          className="gap-1.5 sm:gap-2 text-responsive-sm"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
           Add category
         </Button>
       </div>
@@ -272,7 +197,7 @@ export function Dashboard({
           <p className="text-muted-foreground">No categories yet. Add one above.</p>
         </div>
       ) : (
-        <div className="grid gap-5 sm:grid-cols-3">
+        <div className="grid gap-3 sm:gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {categoriesWithStats.map((cat, index) => {
             const config = getConfig(cat.value, cat.label, index);
             const Icon = CATEGORY_ICONS[cat.value] ?? Folder;
@@ -289,7 +214,7 @@ export function Dashboard({
                   }
                 }}
                 className={cn(
-                  'relative overflow-hidden rounded-xl border border-border/70 p-5 pr-20 min-h-[140px] shadow-sm transition-all duration-200 hover:shadow-md cursor-pointer',
+                  'relative overflow-hidden rounded-lg sm:rounded-xl border border-border/70 p-4 sm:p-5 pr-16 sm:pr-20 min-h-[120px] sm:min-h-[140px] shadow-sm transition-all duration-200 hover:shadow-md cursor-pointer',
                   config.cardBg,
                   'dark:bg-card/80',
                   cat.total === 0 && 'opacity-90'
@@ -328,16 +253,16 @@ export function Dashboard({
                 />
 
                 <div className="relative z-10 flex flex-col gap-0.5">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate">
                     {config.label}
                   </p>
-                  <p className={cn('text-4xl font-bold tabular-nums', config.accent)}>
+                  <p className={cn('text-3xl sm:text-4xl font-bold tabular-nums', config.accent)}>
                     {cat.total}
                   </p>
                 </div>
 
                 {cat.total > 0 && (cat.taskActive > 0 || cat.overdue > 0 || cat.upcoming > 0) && (
-                  <p className="relative z-10 mt-2 text-xs font-medium text-muted-foreground">
+                  <p className="relative z-10 mt-1.5 sm:mt-2 text-[10px] sm:text-xs font-medium text-muted-foreground truncate">
                     {[
                       cat.taskActive > 0 && `${cat.taskActive} task active`,
                       cat.overdue > 0 && `${cat.overdue} over due`,

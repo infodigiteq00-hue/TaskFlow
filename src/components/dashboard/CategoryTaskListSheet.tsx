@@ -1,14 +1,7 @@
 import { useState, useEffect } from 'react';
-import {
-  Task,
-  TeamMember,
-  TaskReminder,
-  RemindInUnit,
-  ReminderRepeat,
-  TASK_STAGE_OPTIONS,
-  getCustomTaskStages,
-  addCustomTaskStage,
-} from '@/types/task';
+import { Task, TeamMember, TASK_STAGE_OPTIONS } from '@/types/task';
+import { getCustomTaskStages, addCustomTaskStage } from '@/lib/taskStageStorage';
+import { getAssignedNames, getDueCountdown, formatDisplayDate, sortTasksByPriorityAndStatus } from '@/lib/taskUtils';
 import { cn } from '@/lib/utils';
 import {
   Sheet,
@@ -22,9 +15,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, Upload, FileText, User, Plus, Pencil, Building2, Bell, Search } from 'lucide-react';
+import { Upload, FileText, User, Plus, Pencil, Building2, Search } from 'lucide-react';
+import { TaskReminderPopover } from './TaskReminderPopover';
 
 interface CategoryTaskListSheetProps {
   open: boolean;
@@ -35,66 +28,6 @@ interface CategoryTaskListSheetProps {
   onUpdateTask: (task: Task) => void;
   onNewTask?: (categoryValue: string) => void;
   onEditTask?: (task: Task) => void;
-}
-
-function getAssignedNames(assignedTo: string[], teamMembers: TeamMember[]): string {
-  if (!assignedTo.length) return 'Unassigned';
-  const names = assignedTo
-    .map((id) => teamMembers.find((m) => m.id === id)?.name)
-    .filter(Boolean) as string[];
-  return names.length ? names.join(', ') : 'Unassigned';
-}
-
-function getDueCountdown(endDate: string, endTime?: string): { text: string; overdue: boolean } {
-  const end = new Date(endDate);
-  if (endTime) {
-    const [h, m] = endTime.split(':').map(Number);
-    end.setHours(h ?? 0, m ?? 0, 0, 0);
-  } else {
-    end.setHours(23, 59, 59, 999);
-  }
-  const now = new Date();
-  const diffMs = end.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-  const diffHours = Math.ceil(diffMs / (1000 * 60 * 60));
-  const diffMins = Math.ceil(diffMs / (1000 * 60));
-  if (diffMs < 0) {
-    const absHours = Math.floor(Math.abs(diffMs) / (1000 * 60 * 60));
-    const absMins = Math.floor((Math.abs(diffMs) % (1000 * 60 * 60)) / (1000 * 60));
-    if (endTime && Math.abs(diffMs) < 24 * 60 * 60 * 1000)
-      return { text: `${absHours}h ${absMins}m overdue`, overdue: true };
-    return { text: `${Math.abs(diffDays)} day(s) overdue`, overdue: true };
-  }
-  if (diffMins < 60 && endTime)
-    return { text: `${diffMins} min left`, overdue: false };
-  if (diffHours < 24 && (endTime || diffHours > 0))
-    return { text: `${diffHours} hour${diffHours !== 1 ? 's' : ''} left`, overdue: false };
-  if (diffDays === 0) return { text: endTime ? `Due today at ${formatTime(endTime)}` : 'Due today', overdue: false };
-  if (diffDays === 1) return { text: '1 day left', overdue: false };
-  return { text: `${diffDays} days left`, overdue: false };
-}
-
-function formatTime(timeStr: string): string {
-  const [h, m] = timeStr.split(':').map(Number);
-  const period = (h ?? 0) >= 12 ? 'PM' : 'AM';
-  const hour = (h ?? 0) % 12 || 12;
-  return `${hour}:${String(m ?? 0).padStart(2, '0')} ${period}`;
-}
-
-function formatDisplayDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-}
-
-const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 } as const;
-const STATUS_ORDER = { urgent: 0, 'in-progress': 1, pending: 2, completed: 3 } as const;
-
-function sortTasksByPriorityAndStatus(tasks: Task[]): Task[] {
-  return [...tasks].sort((a, b) => {
-    const p = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
-    if (p !== 0) return p;
-    return (STATUS_ORDER[a.status as keyof typeof STATUS_ORDER] ?? 4) - (STATUS_ORDER[b.status as keyof typeof STATUS_ORDER] ?? 4);
-  });
 }
 
 export function CategoryTaskListSheet({
@@ -156,59 +89,6 @@ export function CategoryTaskListSheet({
   };
 
   const [reminderPopoverTaskId, setReminderPopoverTaskId] = useState<string | null>(null);
-  const [remindValue, setRemindValue] = useState('30');
-  const [remindUnit, setRemindUnit] = useState<RemindInUnit>('minutes');
-  const [remindRepeat, setRemindRepeat] = useState<ReminderRepeat>('none');
-  const [remindSound, setRemindSound] = useState(true);
-
-  const openReminderFor = (task: Task) => {
-    setReminderPopoverTaskId(task.id);
-    if (task.reminder) {
-      const r = task.reminder;
-      if (r.remindInMinutes < 60) {
-        setRemindValue(String(r.remindInMinutes));
-        setRemindUnit('minutes');
-      } else if (r.remindInMinutes < 24 * 60) {
-        setRemindValue(String(Math.round(r.remindInMinutes / 60)));
-        setRemindUnit('hours');
-      } else {
-        setRemindValue(String(Math.round(r.remindInMinutes / (24 * 60))));
-        setRemindUnit('days');
-      }
-      setRemindRepeat(r.repeat);
-      setRemindSound(r.sound);
-    } else {
-      setRemindValue('30');
-      setRemindUnit('minutes');
-      setRemindRepeat('none');
-      setRemindSound(true);
-    }
-  };
-
-  const getRemindInMinutes = (): number => {
-    const v = Math.max(0, Math.floor(Number(remindValue) || 0));
-    if (remindUnit === 'minutes') return v;
-    if (remindUnit === 'hours') return v * 60;
-    return v * 24 * 60;
-  };
-
-  const handleSetReminder = (task: Task) => {
-    const remindInMinutes = getRemindInMinutes();
-    if (remindInMinutes <= 0) return;
-    const reminder: TaskReminder = {
-      remindInMinutes,
-      repeat: remindRepeat,
-      sound: remindSound,
-      setAt: new Date().toISOString(),
-    };
-    onUpdateTask({ ...task, reminder, updatedAt: new Date().toISOString() });
-    setReminderPopoverTaskId(null);
-  };
-
-  const handleClearReminder = (task: Task) => {
-    onUpdateTask({ ...task, reminder: undefined, updatedAt: new Date().toISOString() });
-    setReminderPopoverTaskId(null);
-  };
 
   const handleStageChange = (task: Task, stage: string) => {
     onUpdateTask({
@@ -273,7 +153,7 @@ export function CategoryTaskListSheet({
           ) : (
             <ul className="space-y-3">
               {filteredCategoryTasks.map((task) => {
-                const due = getDueCountdown(task.endDate, task.endTime);
+                const due = getDueCountdown(task.endDate, task.endTime, { formatTimeForToday: true });
                 const assignedNames = getAssignedNames(task.assignedTo, teamMembers);
                 const isComplete = task.status === 'completed';
 
@@ -365,104 +245,23 @@ export function CategoryTaskListSheet({
                           </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 pt-1">
-                          <Popover
+                          <TaskReminderPopover
+                            task={task}
                             open={reminderPopoverTaskId === task.id}
-                            onOpenChange={(open) => !open && setReminderPopoverTaskId(null)}
-                          >
-                            <PopoverTrigger asChild>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className={cn(
-                                  'h-8 gap-1.5 text-xs',
-                                  task.reminder && 'text-blue-600 dark:text-blue-400'
-                                )}
-                                onClick={() => openReminderFor(task)}
-                              >
-                                <Bell className="h-3.5 w-3.5" />
-                                Reminder
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-80" align="start">
-                              <div className="space-y-4">
-                                <div>
-                                  <h4 className="font-semibold text-sm">Set reminder</h4>
-                                  <p className="text-xs text-muted-foreground mt-0.5">
-                                    Remind me in
-                                  </p>
-                                </div>
-                                <div className="flex gap-2">
-                                  <Input
-                                    type="number"
-                                    min={1}
-                                    value={remindValue}
-                                    onChange={(e) => setRemindValue(e.target.value)}
-                                    className="w-20"
-                                  />
-                                  <Select
-                                    value={remindUnit}
-                                    onValueChange={(v: RemindInUnit) => setRemindUnit(v)}
-                                  >
-                                    <SelectTrigger className="flex-1">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="minutes">Minutes</SelectItem>
-                                      <SelectItem value="hours">Hours</SelectItem>
-                                      <SelectItem value="days">Days</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                <div className="space-y-2">
-                                  <Label className="text-xs">Repeat</Label>
-                                  <Select
-                                    value={remindRepeat}
-                                    onValueChange={(v: ReminderRepeat) => setRemindRepeat(v)}
-                                  >
-                                    <SelectTrigger>
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="none">Don&apos;t repeat</SelectItem>
-                                      <SelectItem value="hour">Every hour</SelectItem>
-                                      <SelectItem value="day">Every day</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Checkbox
-                                    id="remind-sound"
-                                    checked={remindSound}
-                                    onCheckedChange={(c) => setRemindSound(!!c)}
-                                  />
-                                  <label htmlFor="remind-sound" className="text-sm cursor-pointer">
-                                    Notify with sound
-                                  </label>
-                                </div>
-                                <div className="flex gap-2">
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    className="flex-1"
-                                    onClick={() => reminderPopoverTaskId && handleSetReminder(task)}
-                                  >
-                                    Set reminder
-                                  </Button>
-                                  {task.reminder && (
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => handleClearReminder(task)}
-                                    >
-                                      Clear
-                                    </Button>
-                                  )}
-                                </div>
-                              </div>
-                            </PopoverContent>
-                          </Popover>
+                            onOpenChange={(open) => {
+                              if (open) setReminderPopoverTaskId(task.id);
+                              else setReminderPopoverTaskId(null);
+                            }}
+                            onSetReminder={(t, reminder) => {
+                              onUpdateTask({ ...t, reminder, updatedAt: new Date().toISOString() });
+                              setReminderPopoverTaskId(null);
+                            }}
+                            onClearReminder={(t) => {
+                              onUpdateTask({ ...t, reminder: undefined, updatedAt: new Date().toISOString() });
+                              setReminderPopoverTaskId(null);
+                            }}
+                            checkboxId={`remind-sound-cat-${task.id}`}
+                          />
                           {onEditTask && (
                             <Button
                               type="button"

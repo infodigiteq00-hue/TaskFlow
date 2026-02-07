@@ -42,15 +42,12 @@ import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { formatIST } from '@/lib/dateUtils';
 import { format, parseISO, startOfWeek, subMonths } from 'date-fns';
 
 /** Current user for "recorded by" – can be replaced with auth later */
 const CURRENT_USER_ID = '1';
 const CURRENT_USER_NAME = 'Sarah Johnson';
-
-function formatIST(date: Date): string {
-  return date.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'short', timeStyle: 'short' }) + ' IST';
-}
 
 interface LinkedInManagerProps {
   tasks: Task[];

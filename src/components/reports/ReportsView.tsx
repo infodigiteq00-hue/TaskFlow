@@ -1,45 +1,50 @@
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   PieChart,
   Pie,
   Cell,
   LineChart,
-  Line
+  Line,
 } from 'recharts';
-import { mockTasks, mockTeamMembers, mockCompanies } from '@/data/mockData';
 import { TASK_CATEGORIES } from '@/types/task';
+import type { Task, TeamMember, Company } from '@/types/task';
 
-export function ReportsView() {
+export interface ReportsViewProps {
+  tasks: Task[];
+  teamMembers: TeamMember[];
+  companies: Company[];
+}
+
+export function ReportsView({ tasks, teamMembers, companies }: ReportsViewProps) {
   // Task by category data
-  const categoryData = TASK_CATEGORIES.map(cat => ({
+  const categoryData = TASK_CATEGORIES.map((cat) => ({
     name: cat.label,
-    value: mockTasks.filter(t => t.category === cat.value).length,
+    value: tasks.filter((t) => t.category === cat.value).length,
     icon: cat.icon,
-  })).filter(d => d.value > 0);
+  })).filter((d) => d.value > 0);
 
   // Task by status data
   const statusData = [
-    { name: 'Pending', value: mockTasks.filter(t => t.status === 'pending').length, color: 'hsl(38, 92%, 50%)' },
-    { name: 'In Progress', value: mockTasks.filter(t => t.status === 'in-progress').length, color: 'hsl(199, 89%, 48%)' },
-    { name: 'Completed', value: mockTasks.filter(t => t.status === 'completed').length, color: 'hsl(142, 71%, 45%)' },
-    { name: 'Urgent', value: mockTasks.filter(t => t.status === 'urgent').length, color: 'hsl(0, 84%, 60%)' },
+    { name: 'Pending', value: tasks.filter((t) => t.status === 'pending').length, color: 'hsl(38, 92%, 50%)' },
+    { name: 'In Progress', value: tasks.filter((t) => t.status === 'in-progress').length, color: 'hsl(199, 89%, 48%)' },
+    { name: 'Completed', value: tasks.filter((t) => t.status === 'completed').length, color: 'hsl(142, 71%, 45%)' },
+    { name: 'Urgent', value: tasks.filter((t) => t.status === 'urgent').length, color: 'hsl(0, 84%, 60%)' },
   ];
 
   // Team performance data
-  const teamData = mockTeamMembers.map(member => {
-    const memberTasks = mockTasks.filter(t => t.assignedTo.includes(member.id));
+  const teamData = teamMembers.map((member) => {
+    const memberTasks = tasks.filter((t) => t.assignedTo.includes(member.id));
     return {
       name: member.name.split(' ')[0],
-      completed: memberTasks.filter(t => t.status === 'completed').length,
-      active: memberTasks.filter(t => t.status !== 'completed').length,
+      completed: memberTasks.filter((t) => t.status === 'completed').length,
+      active: memberTasks.filter((t) => t.status !== 'completed').length,
     };
   });
 
@@ -55,39 +60,37 @@ export function ReportsView() {
   ];
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-4 sm:space-y-6 animate-fade-in w-full overflow-x-hidden">
       <div>
-        <h2 className="text-xl font-semibold text-foreground">Performance Reports</h2>
-        <p className="text-muted-foreground text-sm">Analytics and insights for your team</p>
+        <h2 className="text-lg sm:text-xl font-semibold text-foreground">Performance Reports</h2>
+        <p className="text-muted-foreground text-xs sm:text-sm">Analytics and insights for your team</p>
       </div>
 
-      {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="p-4">
-          <p className="text-sm text-muted-foreground">Total Tasks</p>
-          <p className="text-3xl font-bold text-foreground">{mockTasks.length}</p>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <Card className="p-3 sm:p-4">
+          <p className="text-xs sm:text-sm text-muted-foreground">Total Tasks</p>
+          <p className="text-2xl sm:text-3xl font-bold text-foreground">{tasks.length}</p>
         </Card>
-        <Card className="p-4">
-          <p className="text-sm text-muted-foreground">Completion Rate</p>
-          <p className="text-3xl font-bold text-success">
-            {Math.round((mockTasks.filter(t => t.status === 'completed').length / mockTasks.length) * 100)}%
+        <Card className="p-3 sm:p-4">
+          <p className="text-xs sm:text-sm text-muted-foreground">Completion Rate</p>
+          <p className="text-2xl sm:text-3xl font-bold text-success">
+            {tasks.length > 0 ? Math.round((tasks.filter((t) => t.status === 'completed').length / tasks.length) * 100) : 0}%
           </p>
         </Card>
-        <Card className="p-4">
-          <p className="text-sm text-muted-foreground">Active Companies</p>
-          <p className="text-3xl font-bold text-foreground">{mockCompanies.length}</p>
+        <Card className="p-3 sm:p-4">
+          <p className="text-xs sm:text-sm text-muted-foreground">Active Companies</p>
+          <p className="text-2xl sm:text-3xl font-bold text-foreground">{companies.length}</p>
         </Card>
-        <Card className="p-4">
-          <p className="text-sm text-muted-foreground">Team Members</p>
-          <p className="text-3xl font-bold text-foreground">{mockTeamMembers.length}</p>
+        <Card className="p-3 sm:p-4">
+          <p className="text-xs sm:text-sm text-muted-foreground">Team Members</p>
+          <p className="text-2xl sm:text-3xl font-bold text-foreground">{teamMembers.length}</p>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Task Status Distribution */}
-        <Card className="p-5">
-          <h3 className="font-semibold text-foreground mb-4">Task Status Distribution</h3>
-          <div className="h-64">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        <Card className="p-4 sm:p-5">
+          <h3 className="font-semibold text-foreground text-sm sm:text-base mb-3 sm:mb-4">Task Status Distribution</h3>
+          <div className="h-48 sm:h-64 min-h-[12rem]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -107,23 +110,22 @@ export function ReportsView() {
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div className="flex flex-wrap justify-center gap-4 mt-4">
+          <div className="flex flex-wrap justify-center gap-2 sm:gap-4 mt-3 sm:mt-4">
             {statusData.map((status) => (
-              <div key={status.name} className="flex items-center gap-2">
-                <div 
-                  className="w-3 h-3 rounded-full" 
+              <div key={status.name} className="flex items-center gap-1.5 sm:gap-2">
+                <div
+                  className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full shrink-0"
                   style={{ backgroundColor: status.color }}
                 />
-                <span className="text-sm text-muted-foreground">{status.name}: {status.value}</span>
+                <span className="text-xs sm:text-sm text-muted-foreground">{status.name}: {status.value}</span>
               </div>
             ))}
           </div>
         </Card>
 
-        {/* Tasks by Category */}
-        <Card className="p-5">
-          <h3 className="font-semibold text-foreground mb-4">Tasks by Category</h3>
-          <div className="h-64">
+        <Card className="p-4 sm:p-5">
+          <h3 className="font-semibold text-foreground text-sm sm:text-base mb-3 sm:mb-4">Tasks by Category</h3>
+          <div className="h-48 sm:h-64 min-h-[12rem]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={categoryData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} />
@@ -136,10 +138,9 @@ export function ReportsView() {
           </div>
         </Card>
 
-        {/* Team Performance */}
-        <Card className="p-5">
-          <h3 className="font-semibold text-foreground mb-4">Team Performance</h3>
-          <div className="h-64">
+        <Card className="p-4 sm:p-5">
+          <h3 className="font-semibold text-foreground text-sm sm:text-base mb-3 sm:mb-4">Team Performance</h3>
+          <div className="h-48 sm:h-64 min-h-[12rem]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={teamData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -153,10 +154,9 @@ export function ReportsView() {
           </div>
         </Card>
 
-        {/* Weekly Progress */}
-        <Card className="p-5">
-          <h3 className="font-semibold text-foreground mb-4">Weekly Task Completion</h3>
-          <div className="h-64">
+        <Card className="p-4 sm:p-5">
+          <h3 className="font-semibold text-foreground text-sm sm:text-base mb-3 sm:mb-4">Weekly Task Completion</h3>
+          <div className="h-48 sm:h-64 min-h-[12rem]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={weeklyData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />

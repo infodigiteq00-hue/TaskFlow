@@ -1,15 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useEffect } from 'react';
 import { Task, TaskCategory, TaskStatus, CategoryOption, Company, TeamMember } from '@/types/task';
 import { mockTeamMembers } from '@/data/mockData';
-import { Calendar, Upload, Mic, Video, Image, Plus } from 'lucide-react';
+import { Upload, Mic, Video, Image, Plus } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import { AddCompanyDialog } from './AddCompanyDialog';
 
 const emptyForm = {
   title: '',
@@ -53,8 +53,6 @@ export function NewTaskDialog({
 }: NewTaskDialogProps) {
   const [formData, setFormData] = useState(emptyForm);
   const [addCompanyOpen, setAddCompanyOpen] = useState(false);
-  const [newCompanyName, setNewCompanyName] = useState('');
-  const [newCompanyEmail, setNewCompanyEmail] = useState('');
 
   const isEditMode = !!editTask;
 
@@ -88,21 +86,9 @@ export function NewTaskDialog({
     setFormData((prev) => ({ ...prev, companyId: value }));
   };
 
-  const handleAddCompanySubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const name = newCompanyName.trim();
-    if (!name || !onAddCompany) return;
-    const newCompany: Company = {
-      id: Date.now().toString(),
-      name,
-      contactEmail: newCompanyEmail.trim() || undefined,
-      linkedInSubscription: false,
-      createdAt: new Date().toISOString().slice(0, 10),
-    };
-    onAddCompany(newCompany);
-    setFormData((prev) => ({ ...prev, companyId: newCompany.id }));
-    setNewCompanyName('');
-    setNewCompanyEmail('');
+  const handleAddCompany = (company: Company) => {
+    onAddCompany?.(company);
+    setFormData((prev) => ({ ...prev, companyId: company.id }));
     setAddCompanyOpen(false);
   };
 
@@ -148,14 +134,14 @@ export function NewTaskDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-5 md:p-6">
         <DialogHeader>
-          <DialogTitle className="text-xl">
+          <DialogTitle className="text-lg sm:text-xl">
             {isEditMode ? 'Edit Task' : 'Create New Task'}
           </DialogTitle>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-6 mt-4">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6 mt-3 sm:mt-4">
           {/* Task Type / Category */}
           <div className="space-y-2">
             <Label>Task Type</Label>
@@ -217,43 +203,11 @@ export function NewTaskDialog({
           </div>
 
           {onAddCompany && (
-            <Dialog open={addCompanyOpen} onOpenChange={setAddCompanyOpen}>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle>New company</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleAddCompanySubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="company-name">Company name</Label>
-                    <Input
-                      id="company-name"
-                      value={newCompanyName}
-                      onChange={(e) => setNewCompanyName(e.target.value)}
-                      placeholder="e.g. Acme Inc."
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="company-email">Contact email (optional)</Label>
-                    <Input
-                      id="company-email"
-                      type="email"
-                      value={newCompanyEmail}
-                      onChange={(e) => setNewCompanyEmail(e.target.value)}
-                      placeholder="contact@company.com"
-                    />
-                  </div>
-                  <div className="flex justify-end gap-2 pt-2">
-                    <Button type="button" variant="outline" onClick={() => setAddCompanyOpen(false)}>
-                      Cancel
-                    </Button>
-                    <Button type="submit" disabled={!newCompanyName.trim()}>
-                      Add company
-                    </Button>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <AddCompanyDialog
+              open={addCompanyOpen}
+              onOpenChange={setAddCompanyOpen}
+              onAddCompany={handleAddCompany}
+            />
           )}
 
           {/* Description with media support */}

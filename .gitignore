@@ -1,3 +1,22 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Build output
+dist
+dist-ssr
+build
+*.tsbuildinfo
+
+# Environment and secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+
 # Logs
 logs
 *.log
@@ -7,18 +26,43 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# Runtime / cache
 *.local
+.cache
+.parcel-cache
+.vite
+.turbo
 
-# Editor directories and files
+# Testing
+coverage
+*.lcov
+.nyc_output
+
+# IDE and editors
 .vscode/*
 !.vscode/extensions.json
+!.vscode/settings.json
 .idea
-.DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Optional: lockfiles (uncomment if you want to ignore)
+# package-lock.json
+# bun.lockb
+# yarn.lock
+# pnpm-lock.yaml
+
+# Supabase local (if you use Supabase CLI)
+.supabase
+
+# Debug
+*.log
+debug
