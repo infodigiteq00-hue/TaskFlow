@@ -37,13 +37,13 @@ export function useAppState() {
 
   const userId = user?.id ?? null;
 
-  const fetchAll = useCallback(async (uid: string) => {
+  const fetchAll = useCallback(async () => {
     const [companiesRes, teamRes, tasksRes, chatRes, categoriesRes] = await Promise.all([
-      supabase.from('companies').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
-      supabase.from('team_members').select('*').eq('user_id', uid),
-      supabase.from('tasks').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
-      supabase.from('chat_messages').select('*').eq('user_id', uid).order('timestamp', { ascending: true }),
-      supabase.from('custom_categories').select('*').eq('user_id', uid),
+      supabase.from('companies').select('*').order('created_at', { ascending: false }),
+      supabase.from('team_members').select('*'),
+      supabase.from('tasks').select('*').order('created_at', { ascending: false }),
+      supabase.from('chat_messages').select('*').order('timestamp', { ascending: true }),
+      supabase.from('custom_categories').select('*'),
     ]);
 
     if (companiesRes.error) throw companiesRes.error;
@@ -70,7 +70,7 @@ export function useAppState() {
       return;
     }
     setDataLoading(true);
-    fetchAll(userId)
+    fetchAll()
       .catch(console.error)
       .finally(() => setDataLoading(false));
   }, [userId, fetchAll]);
@@ -98,7 +98,6 @@ export function useAppState() {
       const { error } = await supabase
         .from('custom_categories')
         .update({ label: newLabel })
-        .eq('user_id', userId)
         .eq('value', value);
       if (error) {
         console.error(error);
@@ -117,7 +116,6 @@ export function useAppState() {
       const { error } = await supabase
         .from('custom_categories')
         .delete()
-        .eq('user_id', userId)
         .eq('value', value);
       if (error) {
         console.error(error);
@@ -186,7 +184,6 @@ export function useAppState() {
         .from('companies')
         .update(row)
         .eq('id', company.id)
-        .eq('user_id', userId)
         .select('*')
         .single();
       if (error) {
@@ -206,8 +203,7 @@ export function useAppState() {
       const { error } = await supabase
         .from('companies')
         .delete()
-        .eq('id', companyId)
-        .eq('user_id', userId);
+        .eq('id', companyId);
       if (error) {
         console.error(error);
         return;
@@ -243,7 +239,6 @@ export function useAppState() {
         .from('tasks')
         .update(row)
         .eq('id', task.id)
-        .eq('user_id', userId)
         .select('*')
         .single();
       if (error) {
