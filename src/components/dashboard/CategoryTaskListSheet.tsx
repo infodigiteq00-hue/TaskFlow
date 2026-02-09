@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Task, TeamMember, TASK_STAGE_OPTIONS } from '@/types/task';
 import { getCustomTaskStages, addCustomTaskStage } from '@/lib/taskStageStorage';
 import { getAssignedNames, getDueCountdown, formatDisplayDate, sortTasksByPriorityAndStatus } from '@/lib/taskUtils';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/context/AuthContext';
+import { uploadTaskFile } from '@/lib/storage';
 import {
   Sheet,
   SheetContent,
@@ -40,6 +42,10 @@ export function CategoryTaskListSheet({
   onNewTask,
   onEditTask,
 }: CategoryTaskListSheetProps) {
+  const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [taskForUpload, setTaskForUpload] = useState<Task | null>(null);
+  const [uploadingTaskId, setUploadingTaskId] = useState<string | null>(null);
   const [categorySearchQuery, setCategorySearchQuery] = useState('');
   const categoryTasks = category
     ? sortTasksByPriorityAndStatus(tasks.filter((t) => t.category === category.value))
@@ -76,15 +82,29 @@ export function CategoryTaskListSheet({
   };
 
   const handleUploadClick = (task: Task) => {
-    const url = prompt('Document URL (or leave empty to clear):', task.finalFileUrl || '');
-    if (url !== null) {
+    if (!user) return;
+    setTaskForUpload(task);
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const task = taskForUpload;
+    e.target.value = '';
+    setTaskForUpload(null);
+    if (!file || !task || !user) return;
+    setUploadingTaskId(task.id);
+    try {
+      const url = await uploadTaskFile(user.id, file, task.id);
       const now = new Date().toISOString();
       onUpdateTask({
         ...task,
-        finalFileUrl: url || undefined,
-        docUploadedAt: url ? now : undefined,
+        finalFileUrl: url,
+        docUploadedAt: now,
         updatedAt: now,
       });
+    } finally {
+      setUploadingTaskId(null);
     }
   };
 
@@ -277,15 +297,24 @@ export function CategoryTaskListSheet({
                               Edit
                             </Button>
                           )}
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            className="sr-only"
+                            accept="image/*,application/pdf,video/*,.doc,.docx"
+                            onChange={handleFileChange}
+                            aria-hidden
+                          />
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
                             className="h-8 gap-1.5 text-xs"
+                            disabled={!user || uploadingTaskId === task.id}
                             onClick={() => handleUploadClick(task)}
                           >
                             <Upload className="h-3.5 w-3.5" />
-                            {task.finalFileUrl ? 'View / change doc' : 'Upload doc'}
+                            {uploadingTaskId === task.id ? 'Uploading…' : task.finalFileUrl ? 'View / change doc' : 'Upload doc'}
                           </Button>
                         </div>
                         {task.finalFileUrl && (

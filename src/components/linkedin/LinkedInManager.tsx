@@ -44,10 +44,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils';
 import { formatIST } from '@/lib/dateUtils';
 import { format, parseISO, startOfWeek, subMonths } from 'date-fns';
-
-/** Current user for "recorded by" – can be replaced with auth later */
-const CURRENT_USER_ID = '1';
-const CURRENT_USER_NAME = 'Sarah Johnson';
+import { useAuth } from '@/context/AuthContext';
+import { uploadCompanyLogo, uploadTaskFile } from '@/lib/storage';
 
 interface LinkedInManagerProps {
   tasks: Task[];
@@ -70,7 +68,11 @@ export function LinkedInManager({
   onDeleteCompany,
   onUpdateTask,
 }: LinkedInManagerProps) {
+  const { user } = useAuth();
   const [companiesOpen, setCompaniesOpen] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [docUploading, setDocUploading] = useState(false);
   const [newCompanyOpen, setNewCompanyOpen] = useState(false);
   const [newCompanyName, setNewCompanyName] = useState('');
   const [newCompanyEmail, setNewCompanyEmail] = useState('');
@@ -183,14 +185,14 @@ export function LinkedInManager({
       companyId: addPostClientId,
       companyName: company.name,
       assignedTo: [],
-      assignedBy: CURRENT_USER_ID,
+      assignedBy: user?.id ?? '',
       startDate: addPostDueOn,
       endDate,
       finalFileUrl: docUrl,
       docUploadedAt: docUploadDate,
       linkedInPostUrl: hasLinkedInUrl ? addPostUrl.trim() : undefined,
       linkedInPostedOn: hasLinkedInUrl ? postedOnISO : undefined,
-      linkedInPostedBy: hasLinkedInUrl ? CURRENT_USER_NAME : undefined,
+      linkedInPostedBy: hasLinkedInUrl ? ((user?.user_metadata?.full_name as string) || user?.email || 'User') : undefined,
       priority: 'medium',
       createdAt: now,
       updatedAt: now,
@@ -224,14 +226,18 @@ export function LinkedInManager({
 
   const handleEditCompanyLogoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file?.type.startsWith('image/')) return;
+    if (!file?.type.startsWith('image/') || !user) return;
+    setUploadError(null);
+    setLogoUploading(true);
     try {
-      const dataUrl = await readFileAsDataUrl(file);
-      setEditCompanyLogo(dataUrl);
-    } catch {
-      // ignore
+      const url = await uploadCompanyLogo(user.id, file);
+      setEditCompanyLogo(url);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setLogoUploading(false);
+      e.target.value = '';
     }
-    e.target.value = '';
   };
 
   const handleConfirmDeleteCompany = () => {
@@ -266,49 +272,53 @@ export function LinkedInManager({
     setEditLogoUrl('');
   };
 
-  const readFileAsDataUrl = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-
   const handleLogoFileNew = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file?.type.startsWith('image/')) return;
+    if (!file?.type.startsWith('image/') || !user) return;
+    setUploadError(null);
+    setLogoUploading(true);
     try {
-      const dataUrl = await readFileAsDataUrl(file);
-      setNewCompanyLogo(dataUrl);
-    } catch {
-      // ignore
+      const url = await uploadCompanyLogo(user.id, file);
+      setNewCompanyLogo(url);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setLogoUploading(false);
+      e.target.value = '';
     }
-    e.target.value = '';
   };
 
   const handleLogoFileEdit = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file?.type.startsWith('image/')) return;
+    if (!file?.type.startsWith('image/') || !user) return;
+    setUploadError(null);
+    setLogoUploading(true);
     try {
-      const dataUrl = await readFileAsDataUrl(file);
-      setEditLogoUrl(dataUrl);
-    } catch {
-      // ignore
+      const url = await uploadCompanyLogo(user.id, file);
+      setEditLogoUrl(url);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setLogoUploading(false);
+      e.target.value = '';
     }
-    e.target.value = '';
   };
 
   const handleAddPostDocFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !user) return;
+    setUploadError(null);
+    setDocUploading(true);
     try {
-      const dataUrl = await readFileAsDataUrl(file);
-      setAddPostDocUrl(dataUrl);
+      const url = await uploadTaskFile(user.id, file);
+      setAddPostDocUrl(url);
       setAddPostDocFileName(file.name);
-    } catch {
-      // ignore
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setDocUploading(false);
+      e.target.value = '';
     }
-    e.target.value = '';
   };
 
   const linkedInCompanies = companies.filter((c) => c.linkedInSubscription);
@@ -850,6 +860,9 @@ export function LinkedInManager({
                   placeholder="https://... (doc link)"
                 />
               )}
+              {uploadError && (
+                <p className="text-xs text-destructive">{uploadError}</p>
+              )}
               <div className="flex items-center gap-2">
                 <Input
                   type="file"
@@ -857,16 +870,18 @@ export function LinkedInManager({
                   className="sr-only"
                   id="add-post-doc-file"
                   onChange={handleAddPostDocFile}
+                  disabled={!user || docUploading}
                 />
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   className="gap-1"
-                  onClick={() => document.getElementById('add-post-doc-file')?.click()}
+                  disabled={!user || docUploading}
+                  onClick={() => { setUploadError(null); document.getElementById('add-post-doc-file')?.click(); }}
                 >
                   <Upload className="w-3.5 h-3.5" />
-                  {addPostDocFileName ? 'Replace file' : 'Upload file (image, PDF, video)'}
+                  {docUploading ? 'Uploading…' : addPostDocFileName ? 'Replace file' : 'Upload file (image, PDF, video)'}
                 </Button>
               </div>
             </div>
@@ -881,7 +896,7 @@ export function LinkedInManager({
               />
             </div>
             <p className="text-xs text-muted-foreground border-t pt-3">
-              Recorded by: {CURRENT_USER_NAME} (ID: {CURRENT_USER_ID}) at {formatIST(new Date())}
+              Recorded by: {(user?.user_metadata?.full_name as string) || user?.email || 'User'} at {formatIST(new Date())}
             </p>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setAddPostDialogOpen(false)}>

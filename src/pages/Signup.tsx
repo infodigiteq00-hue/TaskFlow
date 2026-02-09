@@ -86,7 +86,7 @@ export default function Signup() {
             <Input
               id="signup-name"
               type="text"
-              placeholder="Jane Smith"
+              placeholder="full name"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               className="bg-white/50 dark:bg-white/5 border-border/80 focus-visible:ring-accent"
@@ -111,7 +111,7 @@ export default function Signup() {
             <Input
               id="signup-password"
               type="password"
-              placeholder="••••••••"
+              placeholder="••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="bg-white/50 dark:bg-white/5 border-border/80 focus-visible:ring-accent"
@@ -124,7 +124,7 @@ export default function Signup() {
             <Input
               id="signup-confirm"
               type="password"
-              placeholder="••••••••"
+              placeholder="••••••"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="bg-white/50 dark:bg-white/5 border-border/80 focus-visible:ring-accent"
