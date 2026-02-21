@@ -48,16 +48,23 @@ export function ReportsView({ tasks, teamMembers, companies }: ReportsViewProps)
     };
   });
 
-  // Weekly progress (mock data)
-  const weeklyData = [
-    { day: 'Mon', tasks: 3 },
-    { day: 'Tue', tasks: 5 },
-    { day: 'Wed', tasks: 4 },
-    { day: 'Thu', tasks: 7 },
-    { day: 'Fri', tasks: 6 },
-    { day: 'Sat', tasks: 2 },
-    { day: 'Sun', tasks: 1 },
-  ];
+  // Weekly task completion (last 7 days, real data from completed tasks by updatedAt date)
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const toLocalDateStr = (iso: string) => {
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const today = new Date();
+  const weeklyData = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(d.getDate() - (6 - i));
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const count = tasks.filter(
+      (t) => t.status === 'completed' && toLocalDateStr(t.updatedAt) === dateStr
+    ).length;
+    const label = `${dayNames[d.getDay()]} ${d.getDate()}`;
+    return { day: label, tasks: count };
+  });
 
   return (
     <div className="space-y-4 sm:space-y-6 animate-fade-in w-full overflow-x-hidden">

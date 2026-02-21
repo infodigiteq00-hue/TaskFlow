@@ -22,6 +22,8 @@ interface SidebarProps {
   onNewTask: () => void;
   mobileOpen?: boolean;
   onClose?: () => void;
+  /** Unread chat message count; badge hidden when 0 or undefined */
+  unreadChatCount?: number;
 }
 
 const navItems = [
@@ -34,7 +36,7 @@ const navItems = [
   { id: 'reports', label: 'Reports', icon: BarChart3 },
 ];
 
-export function Sidebar({ activeView, onViewChange, onNewTask, mobileOpen = false, onClose }: SidebarProps) {
+export function Sidebar({ activeView, onViewChange, onNewTask, mobileOpen = false, onClose, unreadChatCount = 0 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
 
   const handleNavClick = (view: string) => {
@@ -108,9 +110,9 @@ export function Sidebar({ activeView, onViewChange, onNewTask, mobileOpen = fals
             >
               <Icon className={cn('w-4 h-4 sm:w-5 sm:h-5 shrink-0', isActive && 'text-sidebar-primary')} />
               {!collapsed && <span className="truncate">{item.label}</span>}
-              {item.id === 'chat' && !collapsed && (
-                <span className="ml-auto bg-sidebar-primary text-sidebar-primary-foreground text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full shrink-0">
-                  3
+              {item.id === 'chat' && !collapsed && unreadChatCount > 0 && (
+                <span className="ml-auto bg-sidebar-primary text-sidebar-primary-foreground text-[10px] sm:text-xs min-w-[1.25rem] px-1.5 sm:px-2 py-0.5 rounded-full shrink-0 text-center">
+                  {unreadChatCount > 99 ? '99+' : unreadChatCount}
                 </span>
               )}
             </button>

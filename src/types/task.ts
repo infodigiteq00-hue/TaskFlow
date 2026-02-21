@@ -86,6 +86,16 @@ export interface ChatMessage {
   message: string;
   timestamp: string;
   taskId?: string;
+  /** Emoji reactions: emoji -> list of user ids who reacted */
+  reactions?: Record<string, string[]>;
+  /** User ids who have seen this message (or from DB: { userId, userName }[]) */
+  seenBy?: string[] | { userId: string; userName?: string }[];
+}
+
+/** Normalize seenBy (string[] or object[]) to list of user ids. */
+export function getSeenByIds(seenBy: ChatMessage['seenBy']): string[] {
+  if (!seenBy || !Array.isArray(seenBy)) return [];
+  return seenBy.map((x) => (typeof x === 'string' ? x : x.userId)).filter(Boolean);
 }
 
 export const TASK_CATEGORIES: { value: TaskCategory; label: string; icon: string }[] = [

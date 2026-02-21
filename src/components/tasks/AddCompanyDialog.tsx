@@ -9,12 +9,15 @@ export interface AddCompanyDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAddCompany: (company: Company) => void;
+  /** Called before closing (so parent can ignore the next outer close). Call before onOpenChange(false). */
+  onBeforeClose?: () => void;
 }
 
 export function AddCompanyDialog({
   open,
   onOpenChange,
   onAddCompany,
+  onBeforeClose,
 }: AddCompanyDialogProps) {
   const [newCompanyName, setNewCompanyName] = useState('');
   const [newCompanyEmail, setNewCompanyEmail] = useState('');
@@ -25,6 +28,11 @@ export function AddCompanyDialog({
       setNewCompanyEmail('');
     }
   }, [open]);
+
+  const closeDialog = (open: boolean) => {
+    if (!open) onBeforeClose?.();
+    onOpenChange(open);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,6 +45,7 @@ export function AddCompanyDialog({
       linkedInSubscription: false,
       createdAt: new Date().toISOString().slice(0, 10),
     };
+    onBeforeClose?.();
     onAddCompany(newCompany);
     setNewCompanyName('');
     setNewCompanyEmail('');
@@ -44,7 +53,7 @@ export function AddCompanyDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={closeDialog}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>New company</DialogTitle>
@@ -71,7 +80,7 @@ export function AddCompanyDialog({
             />
           </div>
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => closeDialog(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={!newCompanyName.trim()}>

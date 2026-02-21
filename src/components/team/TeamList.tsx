@@ -2,7 +2,13 @@ import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Mail, Plus, MoreHorizontal } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Mail, Plus, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { TeamMember } from '@/types/task';
 import { Task } from '@/types/task';
 import { AddMemberDialog } from './AddMemberDialog';
@@ -11,10 +17,13 @@ interface TeamListProps {
   teamMembers: TeamMember[];
   tasks: Task[];
   onAddMember: (member: TeamMember) => void;
+  onUpdateMember?: (member: TeamMember) => void;
+  onDeleteMember?: (memberId: string) => void;
 }
 
-export function TeamList({ teamMembers, tasks, onAddMember }: TeamListProps) {
+export function TeamList({ teamMembers, tasks, onAddMember, onUpdateMember, onDeleteMember }: TeamListProps) {
   const [addMemberOpen, setAddMemberOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
 
   return (
     <div className="space-y-4 sm:space-y-6 animate-fade-in w-full">
@@ -47,9 +56,36 @@ export function TeamList({ teamMembers, tasks, onAddMember }: TeamListProps) {
                     <p className="text-xs sm:text-sm text-muted-foreground truncate">{member.role}</p>
                   </div>
                 </div>
-                <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8">
-                  <MoreHorizontal className="w-4 h-4" />
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={(e) => e.stopPropagation()}>
+                      <MoreHorizontal className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingMember(member);
+                      }}
+                    >
+                      <Pencil className="w-4 h-4 mr-2" />
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onDeleteMember && window.confirm(`Remove ${member.name} from the team?`)) {
+                          onDeleteMember(member.id);
+                        }
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               <Badge variant="secondary" className="mb-2 sm:mb-3 text-xs">{member.department}</Badge>
@@ -79,6 +115,13 @@ export function TeamList({ teamMembers, tasks, onAddMember }: TeamListProps) {
         open={addMemberOpen}
         onOpenChange={setAddMemberOpen}
         onAddMember={onAddMember}
+      />
+      <AddMemberDialog
+        open={Boolean(editingMember)}
+        onOpenChange={(open) => !open && setEditingMember(null)}
+        onAddMember={onAddMember}
+        initialMember={editingMember}
+        onUpdateMember={onUpdateMember}
       />
     </div>
   );

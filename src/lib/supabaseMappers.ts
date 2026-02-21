@@ -64,6 +64,8 @@ type DbChatMessage = {
   message: string;
   timestamp: string;
   task_id: string | null;
+  reactions?: Record<string, string[]> | null;
+  seen_by?: string[] | Array<{ user_id: string; user_name?: string } | { id: string; name?: string }> | null;
 };
 
 export function mapCompany(r: DbCompany): Company {
@@ -130,6 +132,15 @@ export function mapChatMessage(r: DbChatMessage): ChatMessage {
     message: r.message,
     timestamp: r.timestamp,
     taskId: r.task_id ?? undefined,
+    reactions: r.reactions && typeof r.reactions === 'object' ? (r.reactions as Record<string, string[]>) : undefined,
+    seenBy: Array.isArray(r.seen_by)
+      ? r.seen_by.map((x) => {
+          if (typeof x === 'string') return { userId: x, userName: undefined };
+          const id = 'user_id' in x ? x.user_id : x.id;
+          const name = 'user_name' in x ? x.user_name : x.name;
+          return { userId: id, userName: name };
+        })
+      : undefined,
   };
 }
 

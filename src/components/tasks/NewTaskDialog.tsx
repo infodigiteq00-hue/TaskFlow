@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,10 +6,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Task, TaskCategory, TaskStatus, CategoryOption, Company, TeamMember } from '@/types/task';
-import { mockTeamMembers } from '@/data/mockData';
-import { Upload, Mic, Video, Image, Plus } from 'lucide-react';
+import { Upload, Mic, Video, Image, Plus, X } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
-import { AddCompanyDialog } from './AddCompanyDialog';
+import { useAuth } from '@/context/AuthContext';
+import { uploadTaskFile } from '@/lib/storage';
 
 const emptyForm = {
   title: '',
@@ -49,15 +49,41 @@ export function NewTaskDialog({
   editTask = null,
   onUpdateTask,
   initialCategory,
-  teamMembers = mockTeamMembers,
+  teamMembers = [],
 }: NewTaskDialogProps) {
+  const { user } = useAuth();
   const [formData, setFormData] = useState(emptyForm);
   const [addCompanyOpen, setAddCompanyOpen] = useState(false);
+  const [newCompanyName, setNewCompanyName] = useState('');
+  const [newCompanyEmail, setNewCompanyEmail] = useState('');
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isEditMode = !!editTask;
 
+  const triggerFileInput = (accept: string) => {
+    const input = fileInputRef.current;
+    if (!input) return;
+    input.accept = accept;
+    input.value = '';
+    input.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) setAttachedFile(file);
+    e.target.value = '';
+  };
+
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setAddCompanyOpen(false);
+      setNewCompanyName('');
+      setNewCompanyEmail('');
+      return;
+    }
+    setAttachedFile(null);
     if (editTask) {
       setFormData({
         title: editTask.title,
@@ -86,15 +112,44 @@ export function NewTaskDialog({
     setFormData((prev) => ({ ...prev, companyId: value }));
   };
 
-  const handleAddCompany = (company: Company) => {
-    onAddCompany?.(company);
-    setFormData((prev) => ({ ...prev, companyId: company.id }));
+  const doAddCompany = () => {
+    const name = newCompanyName.trim();
+    if (!name || !onAddCompany) return;
+    const newCompany: Company = {
+      id: Date.now().toString(),
+      name,
+      contactEmail: newCompanyEmail.trim() || undefined,
+      linkedInSubscription: false,
+      createdAt: new Date().toISOString().slice(0, 10),
+    };
+    onAddCompany(newCompany);
+    setFormData((prev) => ({ ...prev, companyId: newCompany.id }));
+    setNewCompanyName('');
+    setNewCompanyEmail('');
     setAddCompanyOpen(false);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const cancelAddCompany = () => {
+    setAddCompanyOpen(false);
+    setNewCompanyName('');
+    setNewCompanyEmail('');
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const company = companies.find((c) => c.id === formData.companyId);
+    let finalFileUrl: string | undefined;
+    const now = new Date().toISOString();
+
+    if (attachedFile && user) {
+      setUploading(true);
+      try {
+        finalFileUrl = await uploadTaskFile(user.id, attachedFile, isEditMode ? editTask?.id : undefined);
+      } finally {
+        setUploading(false);
+      }
+    }
+
     if (isEditMode && editTask && onUpdateTask) {
       onUpdateTask({
         ...editTask,
@@ -102,12 +157,15 @@ export function NewTaskDialog({
         endTime: formData.endTime || undefined,
         isCoreTask: formData.isCoreTask,
         companyName: company?.name ?? editTask.companyName,
-        updatedAt: new Date().toISOString(),
+        ...(finalFileUrl && { finalFileUrl, docUploadedAt: now }),
+        updatedAt: now,
       });
       setFormData(emptyForm);
+      setAttachedFile(null);
       onOpenChange(false);
       return;
     }
+
     onSubmit({
       ...formData,
       endTime: formData.endTime || undefined,
@@ -116,10 +174,12 @@ export function NewTaskDialog({
       companyName: company?.name || '',
       status: 'pending' as TaskStatus,
       assignedBy: '1',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      ...(finalFileUrl && { finalFileUrl, docUploadedAt: now }),
+      createdAt: now,
+      updatedAt: now,
     } as Task);
     setFormData(emptyForm);
+    setAttachedFile(null);
     onOpenChange(false);
   };
 
@@ -177,38 +237,77 @@ export function NewTaskDialog({
           {/* Company */}
           <div className="space-y-2">
             <Label>Company</Label>
-            <Select
-              value={formData.companyId}
-              onValueChange={handleCompanyValueChange}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select company" />
-              </SelectTrigger>
-              <SelectContent>
-                {companies.map((company) => (
-                  <SelectItem key={company.id} value={company.id}>
-                    {company.name}
-                  </SelectItem>
-                ))}
+            {!addCompanyOpen ? (
+              <>
+                <Select
+                  value={formData.companyId}
+                  onValueChange={handleCompanyValueChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select company" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                    {onAddCompany && (
+                      <SelectItem value={NEW_COMPANY_VALUE} className="text-primary font-medium">
+                        <span className="flex items-center gap-2">
+                          <Plus className="h-4 w-4" />
+                          New company
+                        </span>
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
                 {onAddCompany && (
-                  <SelectItem value={NEW_COMPANY_VALUE} className="text-primary font-medium">
-                    <span className="flex items-center gap-2">
-                      <Plus className="h-4 w-4" />
-                      New company
-                    </span>
-                  </SelectItem>
+                  <p className="text-xs text-muted-foreground">
+                    Or choose &quot;New company&quot; above to add one.
+                  </p>
                 )}
-              </SelectContent>
-            </Select>
+              </>
+            ) : (
+              <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-4">
+                <p className="text-sm font-medium text-foreground">New company</p>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="new-company-name">Company name</Label>
+                    <Input
+                      id="new-company-name"
+                      value={newCompanyName}
+                      onChange={(e) => setNewCompanyName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); doAddCompany(); } }}
+                      placeholder="e.g. Acme Inc."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-company-email">Contact email (optional)</Label>
+                    <Input
+                      id="new-company-email"
+                      type="email"
+                      value={newCompanyEmail}
+                      onChange={(e) => setNewCompanyEmail(e.target.value)}
+                      placeholder="contact@company.com"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="outline" onClick={cancelAddCompany}>
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      disabled={!newCompanyName.trim()}
+                      onClick={doAddCompany}
+                    >
+                      Add company
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-
-          {onAddCompany && (
-            <AddCompanyDialog
-              open={addCompanyOpen}
-              onOpenChange={setAddCompanyOpen}
-              onAddCompany={handleAddCompany}
-            />
-          )}
 
           {/* Description with media support */}
           <div className="space-y-2">
@@ -220,23 +319,75 @@ export function NewTaskDialog({
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
               rows={4}
             />
-            <div className="flex items-center gap-2 pt-2">
-              <Button type="button" variant="outline" size="sm" className="gap-1.5">
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="sr-only"
+              aria-hidden
+              onChange={handleFileChange}
+            />
+            <div className="flex flex-wrap items-center gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => triggerFileInput('audio/*')}
+                disabled={uploading}
+              >
                 <Mic className="w-4 h-4" />
                 Audio
               </Button>
-              <Button type="button" variant="outline" size="sm" className="gap-1.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => triggerFileInput('video/*')}
+                disabled={uploading}
+              >
                 <Video className="w-4 h-4" />
                 Video
               </Button>
-              <Button type="button" variant="outline" size="sm" className="gap-1.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => triggerFileInput('image/*')}
+                disabled={uploading}
+              >
                 <Image className="w-4 h-4" />
                 Image
               </Button>
-              <Button type="button" variant="outline" size="sm" className="gap-1.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => triggerFileInput('*')}
+                disabled={uploading}
+              >
                 <Upload className="w-4 h-4" />
                 File
               </Button>
+              {attachedFile && (
+                <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <span className="truncate max-w-[140px]" title={attachedFile.name}>
+                    {attachedFile.name}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 shrink-0"
+                    onClick={() => setAttachedFile(null)}
+                    aria-label="Remove attachment"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </Button>
+                </span>
+              )}
             </div>
           </div>
 
@@ -333,11 +484,11 @@ export function NewTaskDialog({
 
           {/* Submit */}
           <div className="flex justify-end gap-3 pt-4 border-t">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={uploading}>
               Cancel
             </Button>
-            <Button type="submit" variant="accent">
-              {isEditMode ? 'Save Changes' : 'Create Task'}
+            <Button type="submit" variant="accent" disabled={uploading}>
+              {uploading ? 'Uploading…' : isEditMode ? 'Save Changes' : 'Create Task'}
             </Button>
           </div>
         </form>

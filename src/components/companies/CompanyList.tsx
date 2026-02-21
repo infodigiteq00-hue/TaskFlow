@@ -1,8 +1,16 @@
+import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Building2, Mail, Linkedin, Plus, MoreHorizontal } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Building2, Mail, Linkedin, Plus, MoreHorizontal, Bell } from 'lucide-react';
 import { Company, Task } from '@/types/task';
+import { SendReminderDialog } from './SendReminderDialog';
 
 interface CompanyListProps {
   companies: Company[];
@@ -10,6 +18,8 @@ interface CompanyListProps {
 }
 
 export function CompanyList({ companies, tasks }: CompanyListProps) {
+  const [reminderCompany, setReminderCompany] = useState<Company | null>(null);
+
   return (
     <div className="space-y-4 sm:space-y-6 animate-fade-in w-full">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
@@ -46,9 +56,29 @@ export function CompanyList({ companies, tasks }: CompanyListProps) {
                     )}
                   </div>
                 </div>
-                <Button variant="ghost" size="icon">
-                  <MoreHorizontal className="w-4 h-4" />
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <MoreHorizontal className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setReminderCompany(company);
+                      }}
+                    >
+                      <Bell className="w-4 h-4 mr-2" />
+                      Send reminder
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               {company.contactEmail && (
@@ -78,6 +108,13 @@ export function CompanyList({ companies, tasks }: CompanyListProps) {
           );
         })}
       </div>
+
+      <SendReminderDialog
+        open={Boolean(reminderCompany)}
+        onOpenChange={(open) => !open && setReminderCompany(null)}
+        company={reminderCompany}
+        companyTasks={reminderCompany ? tasks.filter((t) => t.companyId === reminderCompany.id) : []}
+      />
     </div>
   );
 }
